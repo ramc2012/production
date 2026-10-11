@@ -88,7 +88,7 @@ def create_app(settings: Optional[Settings] = None, start_scheduler: Optional[bo
         if (STATIC / "assets").exists():
             app.mount("/assets", StaticFiles(directory=STATIC / "assets"), name="assets")
 
-        @app.get("/{path:path}", include_in_schema=False)
+        @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
         def spa(path: str):
             if path.startswith("api/"):
                 return JSONResponse({"detail": "Not found"}, 404)

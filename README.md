@@ -124,13 +124,30 @@ Practical notes:
   - A FastAPI service with a scheduled daily run.
   - Ranking ambiguous candidates with VFM and test-age evidence.
 
-## Standalone application (handoff to Claude Code)
+## FlowTwin: the standalone application
 
-The next step is a standalone web application (FastAPI + React, SQLite, a Windows service, no Docker). The engine stays a library behind it. Start with `CLAUDE.md` and `docs/handoff/` (PRD, architecture, roadmap, kickoff prompt). `tests/test_golden.py` locks the engine's results during the move.
+`app/` turns the engine into a web application used every day: dashboard, network status, exception
+tickets, wells, tests with engineer overrides, meters, tanks, reconciliation, monthly allocation with
+close/lock and Excel export, the digital twin L0-L5 with interactive what-if, recommendations to accept or
+decline, an L5 simulator sandbox, data upload with validation and preview, a daily scheduler, drop folder,
+backups, users and roles, and an audit log. FastAPI + SQLite + React, offline, no Docker; it installs on
+Windows as a service from an offline bundle.
+
+```bash
+python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+python scripts/dev.py frontend                  # build the UI (Node.js 18+)
+.venv/bin/flowtwin --data-dir var seed-sample   # demo station
+.venv/bin/flowtwin --data-dir var serve         # http://127.0.0.1:8400 (admin password: var/initial_admin_password.txt)
+```
+
+Guides: [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md), [`docs/ADMIN_GUIDE.md`](docs/ADMIN_GUIDE.md).
+Status: [`docs/handoff/PROGRESS.md`](docs/handoff/PROGRESS.md).
 
 ## Layout
 
 ```
+app/                FlowTwin application: backend/ (FastAPI, SQLite, jobs, scheduler), frontend/ (React)
+packaging/windows/  offline installer bundle, service definition
 flowval/            the package (stats, fluids, units, config, network, io, dataquality,
                     welltests, wellmodel, wellperf, separators, tanks, reconciliation, allocation, engine,
                     twin/ = model, predict, prescribe, autonomy, levels, report, run,

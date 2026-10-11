@@ -231,10 +231,26 @@ def test_scheduler_daily_run_is_idempotent(api, twin_run):
     assert scheduler.daily_run("schedule") is None      # same day, same inputs -> skipped
 
 
-def test_backup(api, seeded):
+def test_backup_restore_round_trip(api, twin_run, data_dir, tmp_path):
+    import sqlite3
+    from app.backend.services.scheduler import restore_backup
     r = api.post(f"{V1}/admin/backup")
     assert r.status_code == 200 and r.json()["size"] > 0
-    assert api.get(f"{V1}/admin/backups").json()
+    name = r.json()["file"]
+    assert name in [b["file"] for b in api.get(f"{V1}/admin/backups").json()]
+    with sqlite3.connect(str(data_dir / "flowtwin.sqlite")) as c:
+        live = {t: c.execute(f"SELECT count(*) FROM {t}").fetchone()[0] for t in ("run", "finding", "audit_log")}
+    (tmp_path / "flowtwin.sqlite").write_bytes(b"old")          # an install with a database to replace
+    src, dst, kept = restore_backup(data_dir / "backups" / name, tmp_path)
+    assert kept and kept.read_bytes() == b"old"
+    with sqlite3.connect(str(dst)) as c:
+        restored = {t: c.execute(f"SELECT count(*) FROM {t}").fetchone()[0] for t in ("run", "finding", "audit_log")}
+    assert restored["run"] == live["run"] and restored["finding"] == live["finding"]
+    assert restored["audit_log"] >= live["audit_log"] - 1    # the backup's own audit line may follow it
+    bogus = tmp_path / "not_a_db.sqlite"
+    sqlite3.connect(str(bogus)).close()
+    with pytest.raises(FileNotFoundError):
+        restore_backup(bogus, tmp_path)
 
 
 def test_pages_have_data(api, twin_run):
@@ -249,6 +265,28 @@ def test_pages_have_data(api, twin_run):
     m = {x["id"]: x for x in api.get(f"{V1}/meters").json()["meters"]}
     assert m["FT-123"]["bias_days_flagged"] >= 3      # planted +12 % gas meter bias
     assert m["FT-201"]["proving_overdue"] is True
+
+
+def test_dropzone_imports_valid_and_rejects_bad_files(api, twin_run, data_dir):
+    import os
+    from app.backend.services import scheduler
+    dz = data_dir / "dropzone"
+    bad = dz / "meter_daily.csv"
+    bad.write_text("date,meter_id,volume\n2026-09-30,FT-111,lots\n")
+    os.utime(bad, (1, 1))                                   # older than the 10 s "still being written" guard
+    assert scheduler.scan_dropzone() is None
+    rej = list((dz / "rejected").glob("*/REJECTED_report.txt"))
+    assert rej and "non-numeric volume" in rej[0].read_text()
+    good = dz / "tank_drains.csv"
+    good.write_text("date,tank_id,water_drained_m3\n2026-09-30,T-1,2.8\n")
+    os.utime(good, (1, 1))
+    bid = scheduler.scan_dropzone()
+    assert bid is not None and list((dz / "processed").glob("*/tank_drains.csv"))
+    batches = {b["id"]: b for b in api.get(f"{V1}/data/batches").json()}
+    assert batches[bid]["status"] == "committed" and batches[bid]["source"] == "dropzone"
+    runs = api.get(f"{V1}/runs").json()
+    assert runs[0]["trigger"] == "dropzone"                # a run follows a valid drop
+    assert wait_job(api, runs[0]["job_id"], 300)["status"] == "done"
 
 
 def test_correction_file_updates_only_its_columns(api, twin_run):

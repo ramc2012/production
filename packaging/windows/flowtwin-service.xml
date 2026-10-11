@@ -1,0 +1,22 @@
+<!-- WinSW service definition for FlowTwin. install.ps1 fills in {{VENV}} and {{DATA}}. -->
+<service>
+  <id>FlowTwin</id>
+  <name>FlowTwin</name>
+  <description>FlowTwin: GGS flow validation, allocation and digital twin (read-only towards plant systems).</description>
+  <executable>{{VENV}}\Scripts\python.exe</executable>
+  <arguments>-m app.backend.cli serve</arguments>
+  <workingdirectory>{{DATA}}</workingdirectory>
+  <env name="FLOWTWIN_DATA_DIR" value="{{DATA}}" />
+  <env name="PYTHONUNBUFFERED" value="1" />
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <stoptimeout>20 sec</stoptimeout>
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <resetfailure>1 day</resetfailure>
+  <logpath>{{DATA}}\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+</service>

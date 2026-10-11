@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     tls_key: Optional[Path] = None
     session_hours: int = 12
     site_code: str = "GGS-1"
+    sample_dir: Optional[Path] = None         # synthetic demo GGS (default: data/sample in the source tree)
 
     scheduler_enabled: bool = True
     daily_run_time: str = "06:30"            # local time; validates the production day that ended at 06:00

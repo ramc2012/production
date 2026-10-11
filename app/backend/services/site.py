@@ -96,8 +96,17 @@ def save_config(db: Session, site_id: int, yaml_text: str, user: str, comment: s
     return cv
 
 
-def seed_sample(db: Session, site_id: int, user: str = "seed", folder: Path = SAMPLE) -> dict:
+def sample_folder() -> Path:
+    from ..settings import get_settings
+    f = get_settings().sample_dir or SAMPLE
+    if not (Path(f) / "network.yaml").exists():
+        raise HTTPException(404, f"Sample data not found in {f} (set FLOWTWIN_SAMPLE_DIR)")
+    return Path(f)
+
+
+def seed_sample(db: Session, site_id: int, user: str = "seed", folder: Optional[Path] = None) -> dict:
     """Load the synthetic GGS: network, config and every input CSV as one committed batch."""
+    folder = folder or sample_folder()
     ny = (folder / "network.yaml").read_text(encoding="utf-8")
     cfg = yaml.safe_load(ny)
     static_f = folder / cfg.get("well_static", "well_static.csv")

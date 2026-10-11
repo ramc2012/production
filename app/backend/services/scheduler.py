@@ -147,6 +147,28 @@ def backup_now(keep: Optional[int] = None) -> Path:
     return target
 
 
+def restore_backup(file, data_dir: Path):
+    """Replace <data_dir>/flowtwin.sqlite with a backup (service stopped). The current database is
+    kept as flowtwin.before-restore.sqlite. ``file`` is a path or a name in <data_dir>/backups."""
+    src = Path(file)
+    if not src.exists():
+        src = Path(data_dir) / "backups" / str(file)
+    if not src.exists():
+        raise FileNotFoundError(f"backup not found: {file}")
+    with sqlite3.connect(str(src)) as c:          # refuse anything that is not a FlowTwin database
+        if c.execute("SELECT count(*) FROM sqlite_master WHERE name IN ('run', 'audit_log')").fetchone()[0] != 2:
+            raise FileNotFoundError(f"{src.name} is not a FlowTwin database")
+    dst = Path(data_dir) / "flowtwin.sqlite"
+    kept = None
+    if dst.exists():
+        kept = dst.with_name("flowtwin.before-restore.sqlite")
+        shutil.copy2(dst, kept)
+    for ext in ("-wal", "-shm"):
+        Path(str(dst) + ext).unlink(missing_ok=True)
+    shutil.copy2(src, dst)
+    return src, dst, kept
+
+
 def _hm(t: str):
     h, m = t.split(":")
     return int(h), int(m)

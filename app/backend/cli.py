@@ -13,7 +13,6 @@ from __future__ import annotations
 import argparse
 import logging
 import secrets
-import shutil
 import sys
 from pathlib import Path
 
@@ -77,22 +76,15 @@ def main(argv=None) -> int:
         return 0
 
     if a.cmd == "restore":
+        from .services.scheduler import restore_backup
         from .settings import get_settings
-        s = get_settings()
-        src = Path(a.file)
-        if not src.exists():
-            src = s.backups_dir / a.file
-        if not src.exists():
-            print(f"backup not found: {a.file}")
+        try:
+            src, dst, kept = restore_backup(a.file, get_settings().data_dir)
+        except FileNotFoundError as e:
+            print(e)
             return 1
-        dst = s.data_dir / "flowtwin.sqlite"
-        if dst.exists():
-            keep = dst.with_name("flowtwin.before-restore.sqlite")
-            shutil.copy2(dst, keep)
-            print(f"current database kept as {keep}")
-        for ext in ("-wal", "-shm"):
-            Path(str(dst) + ext).unlink(missing_ok=True)
-        shutil.copy2(src, dst)
+        if kept:
+            print(f"current database kept as {kept}")
         print(f"restored {src.name} -> {dst}. Start the service again.")
         return 0
 
