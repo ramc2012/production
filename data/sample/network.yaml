@@ -1,0 +1,202 @@
+# GGS network definition (synthetic demo). Units: m, m3, ksc(g), degC.
+installation:
+  name: GGS-Demo (synthetic)
+  gas_sg: 0.75
+  oil_rho15_kgm3: 860.0
+  water_rho_kgm3: 1010.0
+wells:
+- id: ANK-101
+  lift: self_flow
+  separator: GS-1
+- id: ANK-102
+  lift: self_flow
+  separator: GS-1
+- id: ANK-103
+  lift: self_flow
+  separator: GS-1
+- id: ANK-104
+  lift: self_flow
+  separator: GS-1
+- id: ANK-105
+  lift: gas_lift
+  separator: GS-1
+  lift_gas_meter: FT-405
+- id: ANK-106
+  lift: gas_lift
+  separator: GS-1
+  lift_gas_meter: FT-406
+- id: ANK-107
+  lift: gas_lift
+  separator: GS-2
+  lift_gas_meter: FT-407
+- id: ANK-108
+  lift: gas_lift
+  separator: GS-2
+  lift_gas_meter: FT-408
+- id: ANK-109
+  lift: srp
+  separator: GS-2
+  plunger_in: 1.75
+  stroke_in: 64
+- id: ANK-110
+  lift: srp
+  separator: GS-2
+  plunger_in: 1.5
+  stroke_in: 54
+- id: ANK-111
+  lift: srp
+  separator: GS-2
+  plunger_in: 1.5
+  stroke_in: 54
+- id: ANK-112
+  lift: srp
+  separator: GS-2
+  plunger_in: 1.25
+  stroke_in: 48
+separators:
+- id: GS-1
+  kind: production
+  phases: 3
+  orientation: horizontal
+  diameter_m: 1.6
+  length_m: 5.0
+  liquid_volume_m3: 5.0
+  shrinkage_factor: 0.965
+  oil_meter: FT-111
+  water_meter: FT-112
+  gas_meter: FT-113
+- id: GS-2
+  kind: production
+  phases: 3
+  orientation: vertical
+  diameter_m: 1.2
+  length_m: 3.5
+  liquid_volume_m3: 0.35
+  shrinkage_factor: 0.965
+  oil_meter: FT-121
+  water_meter: FT-122
+  gas_meter: FT-123
+- id: TS-1
+  kind: test
+  phases: 3
+  orientation: vertical
+  diameter_m: 0.9
+  length_m: 3.0
+  liquid_volume_m3: 0.4
+  shrinkage_factor: 0.96
+  oil_meter: FT-131
+  water_meter: FT-132
+  gas_meter: FT-133
+meters:
+- id: FT-111
+  phase: oil
+  type: pd
+  last_proved: '2026-08-10'
+  proving_interval_days: 90
+  description: GS-1 oil leg
+- id: FT-112
+  phase: water
+  type: mag
+  description: GS-1 water leg
+- id: FT-113
+  phase: gas
+  type: orifice
+  last_proved: '2026-07-20'
+  proving_interval_days: 180
+  description: GS-1 gas
+- id: FT-121
+  phase: oil
+  type: pd
+  last_proved: '2026-08-12'
+  proving_interval_days: 90
+  description: GS-2 oil leg
+- id: FT-122
+  phase: water
+  type: mag
+  description: GS-2 water leg
+- id: FT-123
+  phase: gas
+  type: orifice
+  last_proved: '2026-07-22'
+  proving_interval_days: 180
+  description: GS-2 gas
+- id: FT-131
+  phase: oil
+  type: coriolis
+  last_proved: '2026-08-01'
+  proving_interval_days: 90
+  description: Test sep oil
+- id: FT-132
+  phase: water
+  type: mag
+  description: Test sep water
+- id: FT-133
+  phase: gas
+  type: orifice
+  description: Test sep gas
+- id: FT-201
+  phase: oil
+  type: pd
+  u95_pct: 0.3
+  last_proved: '2026-04-20'
+  proving_interval_days: 90
+  description: Dispatch to CTF
+- id: FT-301
+  phase: gas
+  type: ultrasonic
+  description: Compressor suction
+- id: FT-302
+  phase: gas
+  type: flare_estimate
+  description: Flare (estimated)
+- id: FT-303
+  phase: gas
+  type: vortex
+  description: Fuel gas
+- id: FT-401
+  phase: gas
+  type: orifice
+  description: Lift-gas header
+- id: FT-405
+  phase: gas
+  type: orifice
+  description: ANK-105 lift gas
+- id: FT-406
+  phase: gas
+  type: orifice
+  description: ANK-106 lift gas
+- id: FT-407
+  phase: gas
+  type: orifice
+  description: ANK-107 lift gas
+- id: FT-408
+  phase: gas
+  type: orifice
+  description: ANK-108 lift gas
+tanks:
+- id: T-1
+  strapping_table: strapping/T-1.csv
+  insulated: false
+  calibration_temp_c: 15.0
+  safe_fill_mm: 7200
+- id: T-2
+  strapping_table: strapping/T-2.csv
+  insulated: false
+  calibration_temp_c: 15.0
+  safe_fill_mm: 7200
+- id: T-3
+  strapping_table: strapping/T-3.csv
+  insulated: false
+  calibration_temp_c: 15.0
+  safe_fill_mm: 7200
+dispatch:
+  meter: FT-201
+gas_disposal:
+- meter: FT-301
+  role: compressor
+- meter: FT-302
+  role: flare
+- meter: FT-303
+  role: fuel
+lift_gas:
+  header_meter: FT-401
