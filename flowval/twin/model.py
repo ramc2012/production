@@ -132,7 +132,36 @@ class WellTwin:
 
     tuning_target: str = "pi"
 
+    def _state_key(self, choke, lift_gas, spm, on):
+        """Everything ``solve`` depends on. Floats are compared exactly, so a hit returns the
+        identical result the full computation would give."""
+        fl = None if self.fluid is None else tuple(vars(self.fluid).items())
+        g = None if self.geom is None else tuple(vars(self.geom).items())
+        return (self.lift, self.pr, self.pb, self.pi, self.tuning, self.tuning_target, self.choke, self.choke_cal,
+                self.flp, self.lift_gas, self.spm, self.stroke, self.plunger, self.ve, self.chp, self.on,
+                self.fallback_rate, fl, g, choke, lift_gas, spm, on)
+
     def solve(self, choke: float = None, lift_gas: float = None, spm: float = None, on: bool = None) -> dict:
+        """Operating point at the given setpoints (current setpoints where None). Memoised on the
+        complete well state: what-if, optimiser and L5 loop re-evaluate the same states often."""
+        try:
+            key = self._state_key(choke, lift_gas, spm, on)
+            hash(key)
+        except TypeError:          # unhashable state (should not happen): compute without the memo
+            return self._solve(choke, lift_gas, spm, on)
+        memo = self.__dict__.setdefault("_memo", {})
+        if key not in memo:
+            if len(memo) > 4096:
+                memo.clear()
+            memo[key] = self._solve(choke, lift_gas, spm, on)
+        return dict(memo[key])
+
+    def __getstate__(self):          # pickles and deep copies leave the memo behind
+        st = dict(self.__dict__)
+        st.pop("_memo", None)
+        return st
+
+    def _solve(self, choke: float = None, lift_gas: float = None, spm: float = None, on: bool = None) -> dict:
         choke = self.choke if choke is None else choke
         lift = self.lift_gas if lift_gas is None else lift_gas
         spm = self.spm if spm is None else spm
