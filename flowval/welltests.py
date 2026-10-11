@@ -46,7 +46,9 @@ def _stability(readings: pd.DataFrame, last_h: int):
     return cv, trend
 
 
-def evaluate_tests(net: Network, data: Dict[str, pd.DataFrame], cfg: dict) -> Tuple[pd.DataFrame, FindingLog]:
+def evaluate_tests(net: Network, data: Dict[str, pd.DataFrame], cfg: dict,
+                   overrides: Optional[Dict[str, dict]] = None) -> Tuple[pd.DataFrame, FindingLog]:
+    overrides = overrides or {}
     wt = cfg["well_test"]
     vf = cfg["vfm"]
     log = FindingLog()
@@ -221,6 +223,12 @@ def evaluate_tests(net: Network, data: Dict[str, pd.DataFrame], cfg: dict) -> Tu
             status = "ACCEPTED_W"
         else:
             status = "ACCEPTED"
+        engine_status, override_reason = status, ""
+        if tid in overrides:   # engineer's decision replaces the engine verdict
+            status = overrides[tid]["status"]
+            override_reason = overrides[tid].get("reason", "")
+            flag("INFO", "test_override", f"Engineer set test {tid} to {status} (engine: {engine_status}): "
+                 f"{override_reason}", None, None, "")
 
         row = dict(test_id=tid, well_id=wid, test_date=tdate, separator_id=sep.id, duration_h=dur,
                    oil_m3d=oil, water_m3d=water, liquid_m3d=liquid, wc=wc, gas_form_sm3d=gas_form,
@@ -228,6 +236,8 @@ def evaluate_tests(net: Network, data: Dict[str, pd.DataFrame], cfg: dict) -> Tu
                    thp_ksc=thp, flp_ksc=flp, choke_64ths=ch, spm=_nz(t.get("spm")),
                    choke_cal=cal, critical_flow=critical, gor_sd_rel=gor_sd_rel, srp_ve=ve, stability_cv=cv,
                    status=status, reasons="; ".join(reasons_rej + reasons_prov + reasons_warn))
+        if tid in overrides:
+            row.update(engine_status=engine_status, override_reason=override_reason)
         rows.append(row)
         if status in USABLE:
             last_ok[wid] = row

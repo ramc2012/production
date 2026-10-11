@@ -14,6 +14,7 @@ from .dataquality import run_data_quality
 from .findings import FindingLog
 from .io import load_inputs
 from .network import Network, load_network
+from .records import frame_records
 from .reconciliation import DVRProblem
 from .separators import meter_u95, separator_measurements
 from .stats import chi2_ppf, sidak_z
@@ -40,6 +41,13 @@ class Results:
     summary: pd.DataFrame
     bias_suspects: pd.DataFrame = field(default_factory=pd.DataFrame)
     well_perf: pd.DataFrame = field(default_factory=pd.DataFrame)
+
+    TABLES = ("findings", "findings_daily", "tests", "wells", "separators", "separator_af", "tanks",
+              "dvr_vars", "dvr_days", "dvr_constraints", "summary", "bias_suspects", "well_perf")
+
+    def to_records(self) -> Dict[str, List[dict]]:
+        """Every result table as plain dicts (NaN -> None) for database insertion."""
+        return {n: frame_records(getattr(self, n)) for n in self.TABLES}
 
 
 def _routing(net: Network, theo: pd.DataFrame, tests_today: pd.DataFrame) -> Dict[str, Dict[str, float]]:
@@ -178,8 +186,42 @@ def run(network_path: str | Path, data_dir: str | Path, config_path=None,
         start: Optional[str] = None, end: Optional[str] = None) -> Results:
     net = load_network(network_path)
     cfg = config_path if isinstance(config_path, dict) else load_config(config_path)
-    data = load_inputs(data_dir)
+    return run_frames(net, load_inputs(data_dir), cfg, start, end)
 
+
+DAILY_TABLES = {"well_daily": "date", "meter_daily": "date", "separator_daily": "date",
+                "tank_drains": "date", "dispatch_daily": "date"}
+
+
+def run_window(net: Network, data: Dict[str, pd.DataFrame], cfg: dict, day: str, history_days: int = 35,
+               test_overrides: Optional[Dict[str, dict]] = None) -> Results:
+    """Daily-job mode: validate ``day`` using only the last ``history_days`` of daily data.
+
+    Well tests and reservoir surveys are kept in full (test registry, test age). The result
+    covers the whole window (persistence / bias need it); callers persist what they need.
+    """
+    lo = (pd.Timestamp(day) - pd.Timedelta(days=history_days)).strftime("%Y-%m-%d")
+    nxt = (pd.Timestamp(day) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+    win = {}
+    for name, df in data.items():
+        if name in DAILY_TABLES:
+            win[name] = df[(df["date"] >= lo) & (df["date"] <= day)].reset_index(drop=True)
+        elif name == "tank_gauges":
+            d = df["datetime"].dt.strftime("%Y-%m-%d")
+            win[name] = df[(d >= lo) & (d <= nxt)].reset_index(drop=True)
+        else:
+            win[name] = df
+    return run_frames(net, win, cfg, lo, day, test_overrides)
+
+
+def run_frames(net: Network, data: Dict[str, pd.DataFrame], cfg: dict,
+               start: Optional[str] = None, end: Optional[str] = None,
+               test_overrides: Optional[Dict[str, dict]] = None) -> Results:
+    """Validate a period from in-memory inputs (``io.prepare_inputs`` output).
+
+    ``test_overrides``: {test_id: {"status": ACCEPTED|PROVISIONAL|REJECTED, "reason": str}}
+    from an engineer; they replace the engine's verdict for those tests.
+    """
     gauge_days = set(data["tank_gauges"]["datetime"].dt.strftime("%Y-%m-%d"))
     all_dates = sorted(data["well_daily"]["date"].unique())
     dates = [d for d in all_dates if (start is None or d >= start) and (end is None or d <= end)]
@@ -191,7 +233,7 @@ def run(network_path: str | Path, data_dir: str | Path, config_path=None,
     log = FindingLog()
     dq_log, bad = run_data_quality(net, data, cfg, dates)
     log.extend(dq_log)
-    tests, wt_log = evaluate_tests(net, data, cfg)
+    tests, wt_log = evaluate_tests(net, data, cfg, test_overrides)
     log.extend(wt_log)
     pres = ReservoirPressure(net, data["reservoir_surveys"])
     tests, cal_log = calibrate_tests(net, tests, data["well_tests"], pres, cfg)

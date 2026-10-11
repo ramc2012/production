@@ -59,23 +59,33 @@ TEXT_COLUMNS = {"well_id", "test_id", "meter_id", "separator_id", "tank_id",
                 "status", "remarks", "survey_type"}
 
 
-def load_inputs(folder: str | Path) -> Dict[str, pd.DataFrame]:
+def read_csv_folder(folder: str | Path) -> Dict[str, pd.DataFrame]:
+    """Raw CSV templates found in ``folder`` (no typing or schema checks)."""
     folder = Path(folder)
+    raw: Dict[str, pd.DataFrame] = {}
+    for name in SCHEMAS:
+        f = folder / f"{name}.csv"
+        if f.exists():
+            raw[name] = pd.read_csv(f)
+    return raw
+
+
+def prepare_inputs(raw: Dict[str, pd.DataFrame]) -> Dict[str, pd.DataFrame]:
+    """Schema-check and type the input tables, wherever they came from (CSV folder or database)."""
     data: Dict[str, pd.DataFrame] = {}
     problems = []
     for name, schema in SCHEMAS.items():
-        f = folder / f"{name}.csv"
-        if not f.exists():
+        if name not in raw or raw[name] is None:
             if name in OPTIONAL_FILES:
                 data[name] = pd.DataFrame(columns=schema["required"] + schema["optional"])
                 continue
-            problems.append(f"missing required file {f.name}")
+            problems.append(f"missing required file {name}.csv")
             continue
-        df = pd.read_csv(f)
-        df.columns = [c.strip() for c in df.columns]
+        df = raw[name].copy()
+        df.columns = [str(c).strip() for c in df.columns]
         miss = [c for c in schema["required"] if c not in df.columns]
         if miss:
-            problems.append(f"{f.name}: missing columns {miss}")
+            problems.append(f"{name}.csv: missing columns {miss}")
         for c in schema["optional"]:
             if c not in df.columns:
                 df[c] = np.nan
@@ -91,3 +101,7 @@ def load_inputs(folder: str | Path) -> Dict[str, pd.DataFrame]:
     if problems:
         raise ValueError("Input problems:\n  " + "\n  ".join(problems))
     return data
+
+
+def load_inputs(folder: str | Path) -> Dict[str, pd.DataFrame]:
+    return prepare_inputs(read_csv_folder(folder))

@@ -145,7 +145,8 @@ class Supervisor:
         return moves
 
     # -- main loop ------------------------------------------------------------
-    def run(self, cycles: Optional[int] = None) -> dict:
+    def run(self, cycles: Optional[int] = None, on_cycle: Optional[Callable[[int, int], None]] = None) -> dict:
+        """``on_cycle(cycle, total)`` is called before each cycle (progress / cancellation hook)."""
         cycles = cycles or int(self.a["cycles"])
         noise = self.a["plant_noise_pct"]
         tol = self.a["verify_tolerance_pct"]
@@ -156,6 +157,8 @@ class Supervisor:
                                     moves=0, rollbacks=0))
         quiet = 0
         for c in range(1, cycles + 1):
+            if on_cycle is not None:
+                on_cycle(c, cycles)
             # 1. re-synchronise the twin to what the plant is doing now
             synchronise(self.twin.wells, dict(zip(obs["well_id"], obs["L_meas"])))
             # 2. optimise on the twin, 3. guard

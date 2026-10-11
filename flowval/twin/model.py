@@ -260,9 +260,10 @@ def synchronise(wells: Dict[str, "WellTwin"], targets: Dict[str, float], iterati
 
 
 def build_twin(res, data_dir, date: Optional[str] = None) -> FacilityTwin:
+    """``data_dir``: a folder of CSV templates, or the in-memory input dict (``io.prepare_inputs``)."""
     net, cfg = res.network, res.cfg
     tc = cfg["twin"]
-    data = load_inputs(data_dir)
+    data = data_dir if isinstance(data_dir, dict) else load_inputs(data_dir)
     date = date or res.dates[-1]
     pres = ReservoirPressure(net, data["reservoir_surveys"])
     wd = data["well_daily"]

@@ -7,6 +7,8 @@ uncertainties U95 (k = 2) in percent unless the key says otherwise.
 from __future__ import annotations
 
 import copy
+import hashlib
+import json
 from pathlib import Path
 
 import yaml
@@ -195,3 +197,9 @@ def load_config(path: str | Path | None = None) -> dict:
     with open(path, "r", encoding="utf-8") as fh:
         user = yaml.safe_load(fh) or {}
     return deep_merge(DEFAULTS, user)
+
+
+def config_hash(cfg: dict) -> str:
+    """Stable short hash of an effective configuration (stored with every run)."""
+    blob = json.dumps(cfg, sort_keys=True, default=str, separators=(",", ":"))
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]

@@ -101,12 +101,21 @@ def load_network(path: str | Path) -> Network:
     with open(path, "r", encoding="utf-8") as fh:
         cfg = yaml.safe_load(fh)
     base = path.parent
+    static_f = base / cfg.get("well_static", "well_static.csv")
+    static = pd.read_csv(static_f) if static_f.exists() else None
+    strapping = {t["id"]: pd.read_csv(base / t["strapping_table"]) for t in cfg.get("tanks", [])}
+    return network_from_dict(cfg, static, strapping)
 
+
+def network_from_dict(cfg: dict, well_static: Optional[pd.DataFrame] = None,
+                      strapping: Optional[Dict[str, pd.DataFrame]] = None) -> Network:
+    """Build a Network from the parsed network.yaml, the well master table and the
+    strapping tables (tank id -> DataFrame[level_mm, volume_m3]). No file access."""
+    strapping = strapping or {}
     meters = {m["id"]: Meter(**m) for m in cfg.get("meters", [])}
     wells = {w["id"]: Well(**w) for w in cfg.get("wells", [])}
-    static_f = base / cfg.get("well_static", "well_static.csv")
-    if static_f.exists():   # tabular well master overrides / completes network.yaml
-        st = pd.read_csv(static_f)
+    if well_static is not None:   # tabular well master overrides / completes network.yaml
+        st = well_static
         fields = set(Well.__dataclass_fields__) - {"id"}
         for _, r in st.iterrows():
             w = wells.get(str(r["well_id"]))
@@ -119,8 +128,10 @@ def load_network(path: str | Path) -> Network:
     tanks = {}
     for t in cfg.get("tanks", []):
         t = dict(t)
-        strap = pd.read_csv(base / t.pop("strapping_table"))
-        strap = strap.sort_values("level_mm").reset_index(drop=True)
+        t.pop("strapping_table", None)
+        if t["id"] not in strapping:
+            raise ValueError(f"Network definition errors:\n  tank {t['id']}: no strapping table")
+        strap = strapping[t["id"]].sort_values("level_mm").reset_index(drop=True)
         tanks[t["id"]] = Tank(strapping=strap, **t)
 
     inst = cfg.get("installation", {})
