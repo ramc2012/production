@@ -41,6 +41,10 @@ extend-exclude = ["app/frontend", "output", "data"]
 select = ["F", "E9", "E7", "B006", "B008"]
 ignore = ["E731", "E741"]
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.File", "fastapi.Form", "fastapi.Body",
+                          "fastapi.UploadFile"]
+
 [tool.ruff.lint.per-file-ignores]
 # Pre-existing unused imports/variables in the engine: tidy in a separate, behaviour-neutral commit.
 "flowval/**" = ["F401", "F841"]
