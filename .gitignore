@@ -11,3 +11,6 @@ app/backend/static/
 *.sqlite
 *.db
 .DS_Store
+var/
+.tools/
+app/frontend/dist/
