@@ -55,7 +55,11 @@ def main(argv=None) -> int:
     sub.add_parser("backup")
     rs = sub.add_parser("restore")
     rs.add_argument("file")
+    p.add_argument("--data-dir", help="data folder (overrides FLOWTWIN_DATA_DIR)")
     a = p.parse_args(argv)
+    if a.data_dir:
+        import os
+        os.environ["FLOWTWIN_DATA_DIR"] = str(Path(a.data_dir).resolve())
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
     if a.cmd == "serve":

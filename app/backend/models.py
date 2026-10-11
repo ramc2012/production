@@ -1,7 +1,8 @@
 """SQLAlchemy models (ARCHITECTURE.md, Data model). Units live in field names, as in the engine.
 
 Design notes
-- Inputs keep the *original cell text* of each CSV/Excel row (``InputRow.payload``); the engine
+- Inputs keep the *original cell text* of each CSV/Excel row (``InputRow.payload``). For the same
+  natural key a newer batch overrides the columns it carries (column-wise merge). The engine
   adapter re-parses it exactly like the CLI, so a run from the database equals a run from files.
 - Every result row carries ``run_id``. Large engine tables are kept whole per run in
   ``RunTable`` (JSON records, every column including uncertainties); the tables the app

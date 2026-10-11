@@ -249,3 +249,18 @@ def test_pages_have_data(api, twin_run):
     m = {x["id"]: x for x in api.get(f"{V1}/meters").json()["meters"]}
     assert m["FT-123"]["bias_days_flagged"] >= 3      # planted +12 % gas meter bias
     assert m["FT-201"]["proving_overdue"] is True
+
+
+def test_correction_file_updates_only_its_columns(api, twin_run):
+    """A partial correction must not blank the other readings of the same well-day (runs last: it changes data)."""
+    from app.backend import engine_adapter as A
+    fix = b"date,well_id,hours_on\n2026-09-30,ANK-104,0\n"
+    b = api.post(f"{V1}/data/upload", files=[("files", ("well_daily_fix.csv", fix, "text/csv"))]).json()
+    assert b["status"] == "preview" and b["datasets"]["well_daily"]["replaced"] == 1
+    assert api.post(f"{V1}/data/batches/{b['id']}/commit").status_code == 200
+    with dbm.session_scope() as db:
+        raw, _ = A.raw_frames(db, 1, datasets=["well_daily"])
+    row = raw["well_daily"]
+    r = row[(row["date"] == "2026-09-30") & (row["well_id"] == "ANK-104")].iloc[0]
+    assert r["hours_on"] == 0
+    assert r["thp_ksc"] == r["thp_ksc"] and r["choke_64ths"] == r["choke_64ths"]   # kept (not NaN)

@@ -77,7 +77,8 @@ def network_yaml(nv: NetworkVersion) -> dict:
 
 # ---------------------------------------------------------------------------- inputs
 def raw_frames(db: Session, site_id: int, datasets=None) -> Tuple[Dict[str, pd.DataFrame], List[int]]:
-    """Committed input rows as text frames, newest batch winning per natural key."""
+    """Committed input rows as text frames. Per natural key, newer batches override the columns they
+    contain (column by column); columns a newer batch does not have keep their earlier value."""
     q = (select(InputRow.dataset, InputRow.natural_key, InputRow.payload, InputRow.batch_id)
          .join(InputBatch, InputBatch.id == InputRow.batch_id)
          .where(InputBatch.site_id == site_id, InputBatch.status == "committed")
@@ -87,7 +88,10 @@ def raw_frames(db: Session, site_id: int, datasets=None) -> Tuple[Dict[str, pd.D
     by_ds: Dict[str, Dict[str, dict]] = {}
     batches = set()
     for ds, key, payload, bid in db.execute(q):
-        by_ds.setdefault(ds, {})[key] = payload     # later batch replaces the same key
+        rows = by_ds.setdefault(ds, {})
+        # a later batch overrides only the columns it carries, so a correction file with a few
+        # columns (e.g. hours_on for one well-day) does not blank the other readings of that row
+        rows[key] = {**rows[key], **payload} if key in rows else payload
         batches.add(bid)
     raw = {}
     for ds, rows in by_ds.items():

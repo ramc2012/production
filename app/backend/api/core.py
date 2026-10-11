@@ -38,17 +38,19 @@ def _issue(i: Issue) -> dict:
 
 
 def object_status(db: Session, run: Run) -> dict:
-    """Worst severity per object on the run's last day, and open issues per object."""
+    """Status per object: the worst of its findings on the run's last day and its still-open issues."""
     out: dict = {}
     for oid, sev in db.execute(select(Finding.object_id, Finding.severity)
                                .where(Finding.run_id == run.id, Finding.date == run.period_end)):
         cur = out.setdefault(oid, {"status": "OK", "open_issues": 0})
         if SEVERITY_ORDER.get(sev, 0) > SEVERITY_ORDER.get(cur["status"], 0):
             cur["status"] = sev
-    for oid, n in db.execute(select(Issue.object_id, func.count()).where(Issue.site_id == run.site_id,
-                                                                         Issue.state != "resolved")
-                             .group_by(Issue.object_id)):
-        out.setdefault(oid, {"status": "OK", "open_issues": 0})["open_issues"] = int(n)
+    for oid, sev in db.execute(select(Issue.object_id, Issue.severity).where(Issue.site_id == run.site_id,
+                                                                             Issue.state != "resolved")):
+        cur = out.setdefault(oid, {"status": "OK", "open_issues": 0})
+        cur["open_issues"] += 1
+        if SEVERITY_ORDER.get(sev, 0) > SEVERITY_ORDER.get(cur["status"], 0):
+            cur["status"] = sev
     return out
 
 

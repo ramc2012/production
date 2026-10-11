@@ -14,3 +14,4 @@ app/backend/static/
 var/
 .tools/
 app/frontend/dist/
+*.tsbuildinfo
